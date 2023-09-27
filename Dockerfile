@@ -6,16 +6,40 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
-# Install Node v16 (LTS) and essential tools in one layer for efficiency.
+# Install Node v16 (LTS) and essential tools.
 ENV NODE_VER="16.17.1"
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates wget python3 apt-utils build-essential \
     bison libyaml-dev libgdbm-dev libreadline-dev libjemalloc-dev libncurses5-dev libffi-dev zlib1g-dev libssl-dev && \
-    ... # Rest of the Node installation
+    ARCH= && \
+    dpkgArch="$(dpkg --print-architecture)" && \
+    case "${dpkgArch##*-}" in \
+        amd64) ARCH='x64';; \
+        ppc64el) ARCH='ppc64le';; \
+        s390x) ARCH='s390x';; \
+        arm64) ARCH='arm64';; \
+        armhf) ARCH='armv7l';; \
+        i386) ARCH='x86';; \
+        *) echo "unsupported architecture"; exit 1 ;; \
+    esac && \
+    echo "Etc/UTC" > /etc/localtime && \
+    wget -q https://nodejs.org/download/release/v$NODE_VER/node-v$NODE_VER-linux-$ARCH.tar.gz && \
+    tar xf node-v$NODE_VER-linux-$ARCH.tar.gz && \
+    rm node-v$NODE_VER-linux-$ARCH.tar.gz && \
+    mv node-v$NODE_VER-linux-$ARCH /opt/node
 
-# Install Ruby 3.0. Removed separate apt update as it's already run.
+# Install Ruby 3.0.
 ENV RUBY_VER="3.0.4"
-RUN ... # Ruby installation
+RUN wget https://cache.ruby-lang.org/pub/ruby/${RUBY_VER%.*}/ruby-$RUBY_VER.tar.gz && \
+    tar xf ruby-$RUBY_VER.tar.gz && \
+    cd ruby-$RUBY_VER && \
+    ./configure --prefix=/opt/ruby \
+        --with-jemalloc \
+        --with-shared \
+        --disable-install-doc && \
+    make -j"$(nproc)" > /dev/null && \
+    make install && \
+    rm -rf ../ruby-$RUBY_VER.tar.gz ../ruby-$RUBY_VER
 
 # Update PATH to include Ruby and Node binaries.
 ENV PATH="${PATH}:/opt/ruby/bin:/opt/node/bin"
@@ -23,14 +47,17 @@ ENV PATH="${PATH}:/opt/ruby/bin:/opt/node/bin"
 # Instead of npm latest, install a specific version for predictability.
 RUN npm install -g npm@8.1.4 && \
     npm install -g yarn@1.22.11 && \
-    gem install bundler@2.2.32 && \
+    gem install bundler -v 2.2.32 && \
     apt-get install -y --no-install-recommends git libicu-dev libidn11-dev libpq-dev shared-mime-info
 
 COPY Gemfile* package.json yarn.lock /opt/mastodon/
 
 RUN cd /opt/mastodon && \
     bundle config set --local deployment 'true' && \
-    ... # The rest remains unchanged
+    bundle config set --local without 'development test' && \
+    bundle config set silence_root_warning true && \
+    bundle install -j"$(nproc)" && \
+    yarn install --pure-lockfile
 
 FROM ubuntu:20.04
 
@@ -43,19 +70,25 @@ COPY --from=build-dep /opt/ruby /opt/ruby
 
 ENV PATH="${PATH}:/opt/ruby/bin:/opt/node/bin:/opt/mastodon/bin"
 
-# User creation and setting the timezone in one layer.
+# User creation and setting the timezone.
 ARG UID=991
 ARG GID=991
 RUN apt-get update && \
     echo "Etc/UTC" > /etc/localtime && \
-    ... # Rest of the user creation
+    apt-get install -y --no-install-recommends whois wget && \
+    addgroup --gid $GID mastodon && \
+    useradd -m -u $UID -g $GID -d /opt/mastodon mastodon && \
+    echo "mastodon:$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 24 | mkpasswd -s -m sha-256)" | chpasswd && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install mastodon runtime dependencies in a single layer.
+# Install mastodon runtime dependencies.
 RUN apt-get update && \
     apt-get -y --no-install-recommends install \
-    ... # Dependencies installation
-    RUN gem install bundler -v 2.2.32
-
+        libssl1.1 libpq5 imagemagick ffmpeg libjemalloc2 \
+        libicu66 libidn11 libyaml-0-2 \
+        file ca-certificates tzdata libreadline8 gcc tini apt-utils && \
+    ln -s /opt/mastodon /mastodon && \
+    gem install bundler -v 2.2.32
 
 # Consolidate the copy commands for mastodon source.
 COPY --chown=mastodon:mastodon . /opt/mastodon
@@ -70,10 +103,11 @@ ENV BIND="0.0.0.0"
 # Switch to mastodon user.
 USER mastodon
 
-# Precompile assets
-RUN ... # This remains unchanged
+# Precompile assets.
+RUN OTP_SECRET=precompile_placeholder SECRET_KEY_BASE=precompile_placeholder rails assets:precompile && \
+    yarn cache clean
 
-# Final setup
+# Final setup.
 WORKDIR /opt/mastodon
 ENTRYPOINT ["/usr/bin/tini", "--"]
 EXPOSE 3000 4000
