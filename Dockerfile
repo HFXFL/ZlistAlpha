@@ -37,7 +37,7 @@ RUN wget https://cache.ruby-lang.org/pub/ruby/${RUBY_VER%.*}/ruby-$RUBY_VER.tar.
         --with-jemalloc \
         --with-shared \
         --disable-install-doc && \
-    make -j"$(nproc)" > /dev/null && \
+    make -j"$(nproc)" && \
     make install && \
     rm -rf ../ruby-$RUBY_VER.tar.gz ../ruby-$RUBY_VER
 
@@ -49,6 +49,10 @@ RUN npm install -g npm@8.1.4 && \
     npm install -g yarn@1.22.11 && \
     gem install bundler -v 2.2.32 && \
     apt-get install -y --no-install-recommends git libicu-dev libidn11-dev libpq-dev shared-mime-info
+
+# Ensure mastodon user has appropriate permissions on gem installation directory.
+RUN mkdir -p /opt/ruby/lib/ruby/gems/3.0.0 && \
+    chown -R mastodon:mastodon /opt/ruby/lib/ruby/gems/3.0.0
 
 COPY Gemfile* package.json yarn.lock /opt/mastodon/
 
@@ -107,7 +111,6 @@ USER mastodon
 RUN bundle install && \
     OTP_SECRET=precompile_placeholder SECRET_KEY_BASE=precompile_placeholder rails assets:precompile && \
     yarn cache clean
-
 
 # Container entry point.
 ENTRYPOINT ["/usr/bin/tini", "--"]
