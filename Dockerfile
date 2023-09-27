@@ -54,7 +54,8 @@ RUN apt-get update && \
 RUN apt-get update && \
     apt-get -y --no-install-recommends install \
     ... # Dependencies installation
-    gem install bundler@2.2.32 # Pinned bundler version for predictability.
+    RUN gem install bundler -v 2.2.32
+
 
 # Consolidate the copy commands for mastodon source.
 COPY --chown=mastodon:mastodon . /opt/mastodon
