@@ -44,7 +44,7 @@ RUN wget https://cache.ruby-lang.org/pub/ruby/${RUBY_VER%.*}/ruby-$RUBY_VER.tar.
 # Update PATH to include Ruby and Node binaries.
 ENV PATH="${PATH}:/opt/ruby/bin:/opt/node/bin"
 
-# Instead of npm latest, install a specific version for predictability.
+# Install specific versions of npm, yarn, and bundler for predictability.
 RUN npm install -g npm@8.1.4 && \
     npm install -g yarn@1.22.11 && \
     gem install bundler -v 2.2.32 && \
@@ -90,9 +90,9 @@ RUN apt-get update && \
     ln -s /opt/mastodon /mastodon && \
     gem install bundler -v 2.2.32
 
-# Consolidate the copy commands for mastodon source.
+# Copy over mastodon source and set the working directory.
 COPY --chown=mastodon:mastodon . /opt/mastodon
-COPY --from=build-dep --chown=mastodon:mastodon /opt/mastodon /opt/mastodon
+WORKDIR /opt/mastodon
 
 # Environment variables for Mastodon.
 ENV RAILS_ENV="production"
@@ -107,7 +107,6 @@ USER mastodon
 RUN OTP_SECRET=precompile_placeholder SECRET_KEY_BASE=precompile_placeholder rails assets:precompile && \
     yarn cache clean
 
-# Final setup.
-WORKDIR /opt/mastodon
+# Container entry point.
 ENTRYPOINT ["/usr/bin/tini", "--"]
 EXPOSE 3000 4000
