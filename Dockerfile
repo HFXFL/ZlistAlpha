@@ -104,8 +104,10 @@ ENV BIND="0.0.0.0"
 USER mastodon
 
 # Precompile assets.
-RUN OTP_SECRET=precompile_placeholder SECRET_KEY_BASE=precompile_placeholder rails assets:precompile && \
+RUN bundle install && \
+    OTP_SECRET=precompile_placeholder SECRET_KEY_BASE=precompile_placeholder rails assets:precompile && \
     yarn cache clean
+
 
 # Container entry point.
 ENTRYPOINT ["/usr/bin/tini", "--"]
