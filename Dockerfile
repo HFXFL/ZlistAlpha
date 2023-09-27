@@ -6,17 +6,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
-# User creation and setting the timezone.
-ARG UID=991
-ARG GID=991
-RUN apt-get update && \
-    echo "Etc/UTC" > /etc/localtime && \
-    apt-get install -y --no-install-recommends whois wget && \
-    addgroup --gid $GID mastodon && \
-    useradd -m -u $UID -g $GID -d /opt/mastodon mastodon && \
-    echo "mastodon:$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 24 | mkpasswd -s -m sha-256)" | chpasswd && \
-    rm -rf /var/lib/apt/lists/*
-
 # Install Node v16 (LTS) and essential tools.
 ENV NODE_VER="16.17.1"
 RUN apt-get update && \
@@ -74,6 +63,17 @@ FROM ubuntu:20.04
 
 # Setting the non-interactive frontend for apt.
 ENV DEBIAN_FRONTEND=noninteractive
+
+# User creation and setting the timezone.
+ARG UID=991
+ARG GID=991
+RUN apt-get update && \
+    echo "Etc/UTC" > /etc/localtime && \
+    apt-get install -y --no-install-recommends whois wget && \
+    addgroup --gid $GID mastodon && \
+    useradd -m -u $UID -g $GID -d /opt/mastodon mastodon && \
+    echo "mastodon:$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 24 | mkpasswd -s -m sha-256)" | chpasswd && \
+    rm -rf /var/lib/apt/lists/*
 
 # Consolidate the copy commands.
 COPY --from=build-dep /opt/node /opt/node
