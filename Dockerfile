@@ -64,22 +64,22 @@ FROM ubuntu:20.04
 # Setting the non-interactive frontend for apt.
 ENV DEBIAN_FRONTEND=noninteractive
 
-# User creation and setting the timezone.
-ARG UID=991
-ARG GID=991
-RUN apt-get update && \
-    echo "Etc/UTC" > /etc/localtime && \
-    apt-get install -y --no-install-recommends whois wget && \
-    addgroup --gid $GID mastodon && \
-    useradd -m -u $UID -g $GID -d /opt/mastodon mastodon && \
-    echo "mastodon:$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 24 | mkpasswd -s -m sha-256)" | chpasswd && \
-    rm -rf /var/lib/apt/lists/*
-
 # Consolidate the copy commands.
 COPY --from=build-dep /opt/node /opt/node
 COPY --from=build-dep /opt/ruby /opt/ruby
 
 ENV PATH="${PATH}:/opt/ruby/bin:/opt/node/bin:/opt/mastodon/bin"
+
+# User creation and setting the timezone.
+ARG UID=991
+ARG GID=991
+RUN apt-get update && \
+    echo "Etc/UTC" > /etc/localtime && \
+    apt-get install -y --no-install-recommends whois wget git && \
+    addgroup --gid $GID mastodon && \
+    useradd -m -u $UID -g $GID -d /opt/mastodon mastodon && \
+    echo "mastodon:$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 24 | mkpasswd -s -m sha-256)" | chpasswd && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install mastodon runtime dependencies.
 RUN apt-get update && \
@@ -87,6 +87,7 @@ RUN apt-get update && \
         libssl1.1 libpq5 imagemagick ffmpeg libjemalloc2 \
         libicu66 libidn11 libyaml-0-2 \
         file ca-certificates tzdata libreadline8 gcc tini apt-utils && \
+    ln -s /opt/mastodon /mastodon && \
     gem install bundler -v 2.2.32
 
 # Copy over mastodon source and set the working directory.
@@ -98,9 +99,6 @@ ENV RAILS_ENV="production"
 ENV NODE_ENV="production"
 ENV RAILS_SERVE_STATIC_FILES="true"
 ENV BIND="0.0.0.0"
-
-# Adjust permissions for mastodon user
-RUN chown -R mastodon:mastodon /opt/ruby
 
 # Switch to mastodon user.
 USER mastodon
