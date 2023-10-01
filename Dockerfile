@@ -88,6 +88,10 @@ RUN apt-get update && \
     echo "mastodon:$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 24 | mkpasswd -s -m sha-256)" | chpasswd && \
     rm -rf /var/lib/apt/lists/*
 
+#Ensure mastodon user has appropriate permissions on gem installation directory and bin directory
+RUN mkdir -p /opt/ruby/lib/ruby/gems/3.0.0 /opt/ruby/bin && \
+    chown -R mastodon:mastodon /opt/ruby/lib/ruby/gems/3.0.0 /opt/ruby/bin
+
 # Install mastodon runtime dependencies
 RUN apt-get update && \
     apt-get -y --no-install-recommends install \
