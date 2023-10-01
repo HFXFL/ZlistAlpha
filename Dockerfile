@@ -94,6 +94,9 @@ RUN apt-get update && \
 COPY --chown=mastodon:mastodon . /opt/mastodon
 WORKDIR /opt/mastodon
 
+# Grant mastodon user permissions for the gems directory.
+RUN chown -R mastodon:mastodon /opt/ruby/lib/ruby/gems
+
 # Environment variables for Mastodon.
 ENV RAILS_ENV="production"
 ENV NODE_ENV="production"
