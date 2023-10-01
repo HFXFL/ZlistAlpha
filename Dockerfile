@@ -99,6 +99,9 @@ ENV NODE_ENV="production"
 ENV RAILS_SERVE_STATIC_FILES="true"
 ENV BIND="0.0.0.0"
 
+# Adjust permissions for mastodon user
+RUN chown -R mastodon:mastodon /opt/ruby
+
 # Switch to mastodon user.
 USER mastodon
 
